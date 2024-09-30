@@ -26,18 +26,22 @@ public class SplineGraph extends JFrame {
         JFreeChart tabulatedChart = createTabulatedChart();
         JFreeChart originalChart = createOriginalChart();
         JFreeChart splineChart = createSplineChart();
+        JFreeChart errorChart = createErrorChart();
 
         ChartPanel tabulatedPanel = new ChartPanel(tabulatedChart);
         ChartPanel originalPanel = new ChartPanel(originalChart);
         ChartPanel splinePanel = new ChartPanel(splineChart);
+        ChartPanel errorPanel = new ChartPanel(errorChart);
 
         panel.add(tabulatedPanel);
         panel.add(originalPanel);
         panel.add(splinePanel);
+        panel.add(errorPanel);
 
         tabulatedPanel.setPreferredSize(new Dimension(800, 200));
         originalPanel.setPreferredSize(new Dimension(800, 200));
         splinePanel.setPreferredSize(new Dimension(800, 200));
+        errorPanel.setPreferredSize(new Dimension(800, 200));
 
         setContentPane(panel);
     }
@@ -204,6 +208,58 @@ public class SplineGraph extends JFrame {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private JFreeChart createErrorChart() {
+        XYSeries errorSeries = new XYSeries("Error of Spline Approximation");
+
+        int N = 50;
+        double x0 = 0.0;
+        double xn = 6.0;
+        double hh = (xn - x0) / N;
+        double[] x = new double[N + 1];
+        double[] y = new double[N + 1];
+        double[] h = new double[N + 1];
+        double[] a = new double[N + 1];
+        double[] b = new double[N + 1];
+        double[] c = new double[N + 1];
+        double[] d = new double[N + 1];
+
+        for (int i = 0; i <= N; i++) {
+            x[i] = x0 + i * hh;
+            y[i] = f(x[i]);
+            h[i] = hh;
+        }
+
+        progonka(y, h, N, c);
+
+        for (int i = 1; i < N; i++) {
+            a[i] = y[i - 1];
+            b[i] = (y[i] - y[i - 1]) / h[i] - (h[i] / 3) * (c[i + 1] + 2 * c[i]);
+            d[i] = (c[i + 1] - c[i]) / (3 * h[i]);
+        }
+        a[N] = y[N - 1];
+        b[N] = (y[N] - y[N - 1]) / h[N] - (2.0 / 3.0) * h[N] * c[N];
+        d[N] = -c[N] / (3 * h[N]);
+
+        for (int i = 0; i <= N - 1; i++) {
+            for (double xx = x[i]; xx < x[i + 1]; xx += 0.01) {
+                double splineValue = a[i + 1] + b[i + 1] * (xx - x[i]) + c[i + 1] * pow((xx - x[i]), 2)
+                        + d[i + 1] * pow((xx - x[i]), 3);
+                double errorValue = Math.abs(splineValue - f(xx));
+                errorSeries.add(xx, errorValue);
+            }
+        }
+
+        XYSeriesCollection dataset = new XYSeriesCollection();
+        dataset.addSeries(errorSeries);
+
+        return ChartFactory.createXYLineChart(
+                "Error of Spline Approximation",
+                "X", "Error",
+                dataset,
+                PlotOrientation.VERTICAL,
+                true, true, false);
     }
 
     public static double f(double x) {
